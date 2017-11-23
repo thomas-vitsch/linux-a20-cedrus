@@ -1403,6 +1403,37 @@ static const struct panel_desc nec_nl4827hc19_05b = {
 	.bus_flags = DRM_BUS_FLAG_PIXDATA_POSEDGE,
 };
 
+/* The clock value is multiplied by 1000.
+ * The actual clock we would like to use is 68571428
+ * This clock is already divided by 2 as this is dual lane.
+ * TODO: Thomas check if this is still valid or should be done differently.
+ */
+static const struct drm_display_mode au_opt_m195rtn01_1_mode = {
+	.clock = 144000,
+	.hdisplay = 1600,
+	.vdisplay = 900,
+
+	.hsync_start = 1600 + 0,
+	.hsync_end = 1600 + 0 + 280,
+	.htotal = 1600 + 520 + 280,
+	.vsync_start = 900 + 0,
+	.vsync_end = 900 + 0 + 34,
+	.vtotal = 900 + 100,
+	.vrefresh = 60,
+	.flags = DRM_MODE_FLAG_DBLCLK
+};
+
+/* Read the mode above. The width value is doubled here for using dual lane. */
+static const struct panel_desc au_opt_m195rtn01_1 = {
+	.modes = &au_opt_m195rtn01_1_mode,
+	.num_modes = 1,
+	.size = {
+		.width = 4372,
+		.height = 2396,
+	},
+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+};
+
 static const struct drm_display_mode netron_dy_e231732_mode = {
 	.clock = 66000,
 	.hdisplay = 1024,
@@ -2061,6 +2092,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
 		.compatible = "nec,nl4827hc19-05b",
 		.data = &nec_nl4827hc19_05b,
+	}, {
+		.compatible = "au_opt,m195rtn01_1",
+		.data = &au_opt_m195rtn01_1,
 	}, {
 		.compatible = "netron-dy,e231732",
 		.data = &netron_dy_e231732,
