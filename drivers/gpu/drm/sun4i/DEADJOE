@@ -1,0 +1,101 @@
+
+*** These modified files were found in JOE when it aborted on Fri Nov 24 09:32:25 2017
+*** JOE was aborted by UNIX signal 15
+
+*** File '(Unnamed)'
+00
+printk
+//printk
+BUILD_DIR
+KERNEL_BUILD_DIR
+KERNEL_BUILD_DIR
+V=0
+V=$(VERBOSE_LVL)
+V
+
+*** File '(Unnamed)'
+cedrus
+DRA7XX
+11 bytes
+11 bytes
+ve_reserved
+ve:
+display-engine
+bind
+panel
+panel
+panel
+rgb
+panel
+drm_of_find_panel_or_bridge
+
+*** File '(Unnamed)'
+/media/forest/projects/inlite_trafo/docs_extern/coffee_it_docs_v2/inlite-bloktrafo-bluetooth-commands_v1_4.html
+/media/forest/projects/inlite_trafo/docs_extern/coffee_it_docs_v2/inlite-bloktrafo-bluetooth-commands_v1_4.html
+/media/forest/projects/inlite_trafo/docs_extern/coffee_it_docs_v2/inlite-bloktrafo-bluetooth-commands_v1_4.html
+../../repo_4-10/linux-sunxi/arch/arm/boot/dts/sun7i-a20.dtsi
+sun7i-a20.dtsi
+sun7i-a20-vpn-lvds.dts
+sun4i_drv.c
+sun4i_drv.c
+sun4i_drv.
+sun4i_drv.c
+sun4i_rgb.c
+sun4i_tcon.c
+sun4i_drv.c
+sun4i_tcon.c
+sun4i_tcon.c
+sun4i_tcon.c
+sun4i_tcon.c
+
+*** File '* Startup Log *'
+Processing '/etc/joe/joerc'...
+Processing '/etc/joe/ftyperc'...
+Finished processing /etc/joe/ftyperc
+Finished processing /etc/joe/joerc
+
+*** These modified files were found in JOE when it aborted on Fri Nov 24 09:32:25 2017
+*** JOE was aborted by UNIX signal 15
+
+*** File '(Unnamed)'
+00
+printk
+//printk
+BUILD_DIR
+KERNEL_BUILD_DIR
+KERNEL_BUILD_DIR
+V=0
+V=$(VERBOSE_LVL)
+V
+
+*** File '(Unnamed)'
+panel
+panel_input
+endpoint
+tcon0
+tcon0
+panel
+hdmo
+hdmi
+tcon0_out
+tcon0
+framebuffer
+
+*** File '(Unnamed)'
+sun7i-a20-vpn-lvds.dts
+sun8i-a33-sinlinx-sina33.dts
+sun7i-a20.dtsi
+sun7i-a20-vpn-lvds.dts
+sun7i-a20-vpn-lvds.dts
+sun7i-a20-vpn-lvds.dts
+sun7i-a20-vpn-lvds.dts
+sun7i-a20.dtsi
+sun7i-a20.dtsi
+sun7i-a20-vpn-lvds.dts
+sun4i_backend.c
+
+*** File '* Startup Log *'
+Processing '/etc/joe/joerc'...
+Processing '/etc/joe/ftyperc'...
+Finished processing /etc/joe/ftyperc
+Finished processing /etc/joe/joerc
