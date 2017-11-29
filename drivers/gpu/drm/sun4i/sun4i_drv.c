@@ -308,23 +308,23 @@ static int sun4i_drv_probe(struct platform_device *pdev)
 
 	for (i = 0;; i++) {
 		struct device_node *pipeline = of_parse_phandle(np,
-								"allwinner,pipelines",
-								i);
+		    "allwinner,pipelines", i);
+
 		if (!pipeline)
-			break;
+		    break;
 
 		count += sun4i_drv_add_endpoints(&pdev->dev, &match,
-						pipeline);
+		    pipeline);
+
 		of_node_put(pipeline);
 
 		DRM_DEBUG_DRIVER("Queued %d outputs on pipeline %d\n",
-				 count, i);
+		    count, i);
 	}
 
 	if (count)
 		return component_master_add_with_match(&pdev->dev,
-						       &sun4i_drv_master_ops,
-						       match);
+		    &sun4i_drv_master_ops, match);
 	else
 		return 0;
 }
