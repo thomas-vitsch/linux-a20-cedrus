@@ -114,8 +114,8 @@
 			compatible = "allwinner,sun5i-a13-video-engine";
 			memory-region = <&ve_reserved>;
 
-			clocks = <&ahb_gates 32>, <&ccu CLK_VE>,
-				 <&dram_gates 0>;
+			clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>,
+				 <&ccu CLK_DRAM_VE>;
 			clock-names = "ahb", "mod", "ram";
 
 			assigned-clocks = <&ccu CLK_VE>;
