@@ -30,6 +30,7 @@
  * @flags:	buffer informational flags
  * @field:	enum v4l2_field; field order of the image in the buffer
  * @timecode:	frame timecode
+ * @request:	this buffer should use this request
  * @sequence:	sequence count of this frame
  *
  * Should contain enough information to be able to cover all the fields
@@ -41,6 +42,7 @@ struct vb2_v4l2_buffer {
 	__u32			flags;
 	__u32			field;
 	struct v4l2_timecode	timecode;
+	__u16			request;
 	__u32			sequence;
 };
 
@@ -111,6 +113,7 @@ int vb2_prepare_buf(struct vb2_queue *q, struct v4l2_buffer *b);
  * from VIDIOC_QBUF() handler in driver.
  */
 int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b);
+int vb2_qbuf_request(struct vb2_queue *q, u16 request, struct vb2_buffer **p_buf);
 
 /**
  * vb2_expbuf() - Export a buffer as a file descriptor

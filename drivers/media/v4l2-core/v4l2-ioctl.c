@@ -437,13 +437,14 @@ static void v4l_print_buffer(const void *arg, bool write_only)
 	const struct v4l2_plane *plane;
 	int i;
 
-	pr_cont("%02ld:%02d:%02d.%08ld index=%d, type=%s, flags=0x%08x, field=%s, sequence=%d, memory=%s",
+	pr_cont("%02ld:%02d:%02d.%08ld index=%d, type=%s, request=%u, "
+		"flags=0x%08x, field=%s, sequence=%d, memory=%s",
 			p->timestamp.tv_sec / 3600,
 			(int)(p->timestamp.tv_sec / 60) % 60,
 			(int)(p->timestamp.tv_sec % 60),
 			(long)p->timestamp.tv_usec,
 			p->index,
-			prt_names(p->type, v4l2_type_names),
+			prt_names(p->type, v4l2_type_names), p->request,
 			p->flags, prt_names(p->field, v4l2_field_names),
 			p->sequence, prt_names(p->memory, v4l2_memory_names));
 
@@ -526,12 +527,15 @@ static void v4l_print_query_ext_ctrl(const void *arg, bool write_only)
 {
 	const struct v4l2_query_ext_ctrl *p = arg;
 
-	pr_cont("id=0x%x, type=%d, name=%.*s, min/max=%lld/%lld, step=%lld, default=%lld, flags=0x%08x, elem_size=%u, elems=%u, nr_of_dims=%u, dims=%u,%u,%u,%u\n",
+	pr_cont("id=0x%x, type=%d, name=%.*s, min/max=%lld/%lld, "
+		"step=%lld, default=%lld, flags=0x%08x, elem_size=%u, elems=%u, "
+		"nr_of_dims=%u, dims=%u,%u,%u,%u, max_reqs=%u, request=%u\n",
 			p->id, p->type, (int)sizeof(p->name), p->name,
 			p->minimum, p->maximum,
 			p->step, p->default_value, p->flags,
 			p->elem_size, p->elems, p->nr_of_dims,
-			p->dims[0], p->dims[1], p->dims[2], p->dims[3]);
+			p->dims[0], p->dims[1], p->dims[2], p->dims[3],
+			p->max_reqs, p->request);
 }
 
 static void v4l_print_querymenu(const void *arg, bool write_only)
@@ -635,6 +639,14 @@ static void v4l_print_decoder_cmd(const void *arg, bool write_only)
 				p->start.speed, p->start.format);
 	else if (p->cmd == V4L2_DEC_CMD_STOP)
 		pr_info("pts=%llu\n", p->stop.pts);
+}
+
+static void v4l_print_request_cmd(const void *arg, bool write_only)
+{
+	const struct v4l2_request_cmd *p = arg;
+
+	pr_cont("cmd=%u, request=%u, flags=0x%x\n",
+			p->cmd, p->request, p->flags);
 }
 
 static void v4l_print_dbg_chip_info(const void *arg, bool write_only)
@@ -1987,9 +1999,9 @@ static int v4l_queryctrl(const struct v4l2_ioctl_ops *ops,
 		test_bit(V4L2_FL_USES_V4L2_FH, &vfd->flags) ? fh : NULL;
 
 	if (vfh && vfh->ctrl_handler)
-		return v4l2_queryctrl(vfh->ctrl_handler, p);
+		return v4l2_queryctrl(vfh->ctrl_handler, vfh->request, p);
 	if (vfd->ctrl_handler)
-		return v4l2_queryctrl(vfd->ctrl_handler, p);
+		return v4l2_queryctrl(vfd->ctrl_handler, 0, p);
 	if (ops->vidioc_queryctrl)
 		return ops->vidioc_queryctrl(file, fh, p);
 	return -ENOTTY;
@@ -2003,10 +2015,15 @@ static int v4l_query_ext_ctrl(const struct v4l2_ioctl_ops *ops,
 	struct v4l2_fh *vfh =
 		test_bit(V4L2_FL_USES_V4L2_FH, &vfd->flags) ? fh : NULL;
 
-	if (vfh && vfh->ctrl_handler)
+	if (vfh && vfh->ctrl_handler) {
+		if (vfh->request && p->request == 0)
+			p->request = vfh->request;
 		return v4l2_query_ext_ctrl(vfh->ctrl_handler, p);
+	}
 	if (vfd->ctrl_handler)
 		return v4l2_query_ext_ctrl(vfd->ctrl_handler, p);
+	if (p->request)
+		return -EINVAL;
 	if (ops->vidioc_query_ext_ctrl)
 		return ops->vidioc_query_ext_ctrl(file, fh, p);
 	return -ENOTTY;
@@ -2040,9 +2057,9 @@ static int v4l_g_ctrl(const struct v4l2_ioctl_ops *ops,
 	struct v4l2_ext_control ctrl;
 
 	if (vfh && vfh->ctrl_handler)
-		return v4l2_g_ctrl(vfh->ctrl_handler, p);
+		return v4l2_g_ctrl(vfh->ctrl_handler, vfh->request, p);
 	if (vfd->ctrl_handler)
-		return v4l2_g_ctrl(vfd->ctrl_handler, p);
+		return v4l2_g_ctrl(vfd->ctrl_handler, 0, p);
 	if (ops->vidioc_g_ctrl)
 		return ops->vidioc_g_ctrl(file, fh, p);
 	if (ops->vidioc_g_ext_ctrls == NULL)
@@ -2074,9 +2091,9 @@ static int v4l_s_ctrl(const struct v4l2_ioctl_ops *ops,
 	struct v4l2_ext_control ctrl;
 
 	if (vfh && vfh->ctrl_handler)
-		return v4l2_s_ctrl(vfh, vfh->ctrl_handler, p);
+		return v4l2_s_ctrl(vfh, vfh->ctrl_handler, vfh->request, p);
 	if (vfd->ctrl_handler)
-		return v4l2_s_ctrl(NULL, vfd->ctrl_handler, p);
+		return v4l2_s_ctrl(NULL, vfd->ctrl_handler, 0, p);
 	if (ops->vidioc_s_ctrl)
 		return ops->vidioc_s_ctrl(file, fh, p);
 	if (ops->vidioc_s_ext_ctrls == NULL)
@@ -2101,12 +2118,17 @@ static int v4l_g_ext_ctrls(const struct v4l2_ioctl_ops *ops,
 		test_bit(V4L2_FL_USES_V4L2_FH, &vfd->flags) ? fh : NULL;
 
 	p->error_idx = p->count;
-	if (vfh && vfh->ctrl_handler)
+	if (vfh && vfh->ctrl_handler) {
+		if (vfh->request && p->request == 0)
+			p->request = vfh->request;
 		return v4l2_g_ext_ctrls(vfh->ctrl_handler, p);
+	}
 	if (vfd->ctrl_handler)
 		return v4l2_g_ext_ctrls(vfd->ctrl_handler, p);
 	if (ops->vidioc_g_ext_ctrls == NULL)
 		return -ENOTTY;
+	if (p->request)
+		return -EINVAL;
 	return check_ext_ctrls(p, 0) ? ops->vidioc_g_ext_ctrls(file, fh, p) :
 					-EINVAL;
 }
@@ -2120,12 +2142,20 @@ static int v4l_s_ext_ctrls(const struct v4l2_ioctl_ops *ops,
 		test_bit(V4L2_FL_USES_V4L2_FH, &vfd->flags) ? fh : NULL;
 
 	p->error_idx = p->count;
-	if (vfh && vfh->ctrl_handler)
+	if (vfh && vfh->ctrl_handler) {
+		if (vfh->request && p->request == 0) {
+			p->request = vfh->request;
+			if (vfh->flags & V4L2_FH_FL_KEEP)
+				p->request |= V4L2_CTRL_REQ_FL_KEEP;
+		}
 		return v4l2_s_ext_ctrls(vfh, vfh->ctrl_handler, p);
+	}
 	if (vfd->ctrl_handler)
 		return v4l2_s_ext_ctrls(NULL, vfd->ctrl_handler, p);
 	if (ops->vidioc_s_ext_ctrls == NULL)
 		return -ENOTTY;
+	if (p->request)
+		return -EINVAL;
 	return check_ext_ctrls(p, 0) ? ops->vidioc_s_ext_ctrls(file, fh, p) :
 					-EINVAL;
 }
@@ -2139,12 +2169,17 @@ static int v4l_try_ext_ctrls(const struct v4l2_ioctl_ops *ops,
 		test_bit(V4L2_FL_USES_V4L2_FH, &vfd->flags) ? fh : NULL;
 
 	p->error_idx = p->count;
-	if (vfh && vfh->ctrl_handler)
+	if (vfh && vfh->ctrl_handler) {
+		if (vfh->request && p->request == 0)
+			p->request = vfh->request;
 		return v4l2_try_ext_ctrls(vfh->ctrl_handler, p);
+	}
 	if (vfd->ctrl_handler)
 		return v4l2_try_ext_ctrls(vfd->ctrl_handler, p);
 	if (ops->vidioc_try_ext_ctrls == NULL)
 		return -ENOTTY;
+	if (p->request)
+		return -EINVAL;
 	return check_ext_ctrls(p, 0) ? ops->vidioc_try_ext_ctrls(file, fh, p) :
 					-EINVAL;
 }
@@ -2294,6 +2329,61 @@ static int v4l_cropcap(const struct v4l2_ioctl_ops *ops,
 		return ret;
 	p->defrect = s.r;
 
+	return 0;
+}
+
+static int v4l_request_cmd(const struct v4l2_ioctl_ops *ops,
+				struct file *file, void *fh, void *arg)
+{
+	struct v4l2_request_cmd *p = arg;
+	struct video_device *vfd;
+	struct v4l2_fh *vfh;
+	int ret;
+
+	vfd = video_devdata(file);
+	if (!test_bit(V4L2_FL_USES_V4L2_FH, &vfd->flags))
+		return -ENOTTY;
+	vfh = file->private_data;
+	if (vfh->ctrl_handler == NULL)
+		return -ENOTTY;
+	ret = v4l2_prio_check(vfd->prio, vfh->prio);
+	if (ret)
+		return ret;
+	if (p->request > USHRT_MAX)
+		return -EINVAL;
+	switch (p->cmd) {
+	case V4L2_REQ_CMD_BEGIN:
+		if (vfh->request)
+			return -EBUSY;
+		if (p->request == 0)
+			return -EINVAL;
+		vfh->request = p->request;
+		if (p->flags & V4L2_REQ_CMD_BEGIN_FL_KEEP)
+			vfh->flags |= V4L2_FH_FL_KEEP;
+		else
+			vfh->flags &= ~V4L2_FH_FL_KEEP;
+		break;
+	case V4L2_REQ_CMD_END:
+		vfh->request = 0;
+		break;
+	case V4L2_REQ_CMD_DELETE:
+		return v4l2_ctrl_delete_request(vfh->ctrl_handler, p->request);
+	case V4L2_REQ_CMD_APPLY:
+		return v4l2_ctrl_apply_request(vfh->ctrl_handler, p->request);
+	case V4L2_REQ_CMD_QUEUE:
+		if (vfd->v4l2_dev->req_queue == NULL)
+			return -ENOSYS;
+		if (p->request == 0)
+			return -EINVAL;
+		if (vfd->lock)
+			mutex_unlock(vfd->lock);
+		ret = vfd->v4l2_dev->req_queue(vfd->v4l2_dev, p->request);
+		if (vfd->lock)
+			mutex_lock(vfd->lock);
+		return ret;
+	default:
+		return -EINVAL;
+	}
 	return 0;
 }
 
@@ -2639,6 +2729,7 @@ static struct v4l2_ioctl_info v4l2_ioctls[] = {
 	IOCTL_INFO_FNC(VIDIOC_ENUM_FREQ_BANDS, v4l_enum_freq_bands, v4l_print_freq_band, 0),
 	IOCTL_INFO_FNC(VIDIOC_DBG_G_CHIP_INFO, v4l_dbg_g_chip_info, v4l_print_dbg_chip_info, INFO_FL_CLEAR(v4l2_dbg_chip_info, match)),
 	IOCTL_INFO_FNC(VIDIOC_QUERY_EXT_CTRL, v4l_query_ext_ctrl, v4l_print_query_ext_ctrl, INFO_FL_CTRL | INFO_FL_CLEAR(v4l2_query_ext_ctrl, id)),
+	IOCTL_INFO_FNC(VIDIOC_REQUEST_CMD, v4l_request_cmd, v4l_print_request_cmd, 0),
 };
 #define V4L2_IOCTLS ARRAY_SIZE(v4l2_ioctls)
 

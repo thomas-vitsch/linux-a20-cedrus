@@ -25,6 +25,8 @@
 #include <linux/list.h>
 #include <linux/videodev2.h>
 
+#define V4L2_FH_FL_KEEP	(1 << 0)
+
 struct video_device;
 struct v4l2_ctrl_handler;
 
@@ -55,6 +57,8 @@ struct v4l2_fh {
 	struct list_head	available;
 	unsigned int		navailable;
 	u32			sequence;
+	u16			request;
+	u16			flags;
 
 #if IS_ENABLED(CONFIG_V4L2_MEM2MEM_DEV)
 	struct v4l2_m2m_ctx	*m2m_ctx;

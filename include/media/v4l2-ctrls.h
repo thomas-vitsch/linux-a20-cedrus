@@ -32,6 +32,8 @@ struct v4l2_subscribed_event;
 struct v4l2_fh;
 struct poll_table_struct;
 
+#define V4L2_CTRL_REQ_FL_KEEP (1UL << 31)
+
 /**
  * union v4l2_ctrl_ptr - A pointer to a control value.
  * @p_s32:	Pointer to a 32-bit signed value.
@@ -105,6 +107,14 @@ struct v4l2_ctrl_type_ops {
  */
 typedef void (*v4l2_ctrl_notify_fnc)(struct v4l2_ctrl *ctrl, void *priv);
 
+struct v4l2_ctrl_req {
+	struct list_head node;
+	u32 request;
+	unsigned keep:1;
+	unsigned applied:1;
+	union v4l2_ctrl_ptr ptr;
+};
+
 /**
  * struct v4l2_ctrl - The control structure.
  *
@@ -156,6 +166,9 @@ typedef void (*v4l2_ctrl_notify_fnc)(struct v4l2_ctrl *ctrl, void *priv);
  * @elem_size:	The size in bytes of the control.
  * @dims:	The size of each dimension.
  * @nr_of_dims:The number of dimensions in @dims.
+ * @nr_of_requests: The number of allocated requests of this control.
+ * @max_reqs:	The maximum number of requests supported by this control.
+ * @request:	The request that the control op operates on.
  * @menu_skip_mask: The control's skip mask for menu controls. This makes it
  *		easy to skip menu items that are not valid. If bit X is set,
  *		then menu item X is skipped. Of course, this only works for
@@ -213,6 +226,9 @@ struct v4l2_ctrl {
 	u32 elem_size;
 	u32 dims[V4L2_CTRL_MAX_DIMS];
 	u32 nr_of_dims;
+	u16 nr_of_requests;
+	u16 max_reqs;
+	struct v4l2_ctrl_req *request;
 	union {
 		u64 step;
 		u64 menu_skip_mask;
@@ -230,6 +246,7 @@ struct v4l2_ctrl {
 
 	union v4l2_ctrl_ptr p_new;
 	union v4l2_ctrl_ptr p_cur;
+	struct list_head *request_lists;
 };
 
 /**
@@ -316,6 +333,7 @@ struct v4l2_ctrl_handler {
  *		V4L2_CTRL_TYPE_INTEGER_MENU.
  * @is_private: If set, then this control is private to its handler and it
  *		will not be added to any other handlers.
+ * @max_reqs:	The maximum number of requests supported by this control.
  */
 struct v4l2_ctrl_config {
 	const struct v4l2_ctrl_ops *ops;
@@ -334,6 +352,7 @@ struct v4l2_ctrl_config {
 	const char * const *qmenu;
 	const s64 *qmenu_int;
 	unsigned int is_private:1;
+	u16 max_reqs;
 };
 
 /**
@@ -980,6 +999,14 @@ static inline int v4l2_ctrl_s_ctrl_string(struct v4l2_ctrl *ctrl, const char *s)
 	return rval;
 }
 
+static inline void v4l2_ctrl_s_max_reqs(struct v4l2_ctrl *ctrl, u16 max_reqs)
+{
+	ctrl->max_reqs = max_reqs;
+}
+
+int v4l2_ctrl_apply_request(struct v4l2_ctrl_handler *hdl, unsigned request);
+int v4l2_ctrl_delete_request(struct v4l2_ctrl_handler *hdl, unsigned request);
+
 /* Internal helper functions that deal with control events. */
 extern const struct v4l2_subscribed_event_ops v4l2_ctrl_sub_ev_ops;
 
@@ -1050,7 +1077,8 @@ unsigned int v4l2_ctrl_poll(struct file *file, struct poll_table_struct *wait);
  *
  * If hdl == NULL then they will all return -EINVAL.
  */
-int v4l2_queryctrl(struct v4l2_ctrl_handler *hdl, struct v4l2_queryctrl *qc);
+int v4l2_queryctrl(struct v4l2_ctrl_handler *hdl,
+		   unsigned request, struct v4l2_queryctrl *qc);
 
 /**
  * v4l2_query_ext_ctrl - Helper function to implement
@@ -1061,8 +1089,7 @@ int v4l2_queryctrl(struct v4l2_ctrl_handler *hdl, struct v4l2_queryctrl *qc);
  *
  * If hdl == NULL then they will all return -EINVAL.
  */
-int v4l2_query_ext_ctrl(struct v4l2_ctrl_handler *hdl,
-			struct v4l2_query_ext_ctrl *qc);
+int v4l2_query_ext_ctrl(struct v4l2_ctrl_handler *hdl, struct v4l2_query_ext_ctrl *qc);
 
 /**
  * v4l2_querymenu - Helper function to implement
@@ -1084,7 +1111,8 @@ int v4l2_querymenu(struct v4l2_ctrl_handler *hdl, struct v4l2_querymenu *qm);
  *
  * If hdl == NULL then they will all return -EINVAL.
  */
-int v4l2_g_ctrl(struct v4l2_ctrl_handler *hdl, struct v4l2_control *ctrl);
+int v4l2_g_ctrl(struct v4l2_ctrl_handler *hdl,
+		unsigned request, struct v4l2_control *ctrl);
 
 /**
  * v4l2_s_ctrl - Helper function to implement
@@ -1098,7 +1126,7 @@ int v4l2_g_ctrl(struct v4l2_ctrl_handler *hdl, struct v4l2_control *ctrl);
  * If hdl == NULL then they will all return -EINVAL.
  */
 int v4l2_s_ctrl(struct v4l2_fh *fh, struct v4l2_ctrl_handler *hdl,
-		struct v4l2_control *ctrl);
+		unsigned request, struct v4l2_control *ctrl);
 
 /**
  * v4l2_g_ext_ctrls - Helper function to implement
@@ -1109,8 +1137,7 @@ int v4l2_s_ctrl(struct v4l2_fh *fh, struct v4l2_ctrl_handler *hdl,
  *
  * If hdl == NULL then they will all return -EINVAL.
  */
-int v4l2_g_ext_ctrls(struct v4l2_ctrl_handler *hdl,
-		     struct v4l2_ext_controls *c);
+int v4l2_g_ext_ctrls(struct v4l2_ctrl_handler *hdl, struct v4l2_ext_controls *c);
 
 /**
  * v4l2_try_ext_ctrls - Helper function to implement
@@ -1121,8 +1148,7 @@ int v4l2_g_ext_ctrls(struct v4l2_ctrl_handler *hdl,
  *
  * If hdl == NULL then they will all return -EINVAL.
  */
-int v4l2_try_ext_ctrls(struct v4l2_ctrl_handler *hdl,
-		       struct v4l2_ext_controls *c);
+int v4l2_try_ext_ctrls(struct v4l2_ctrl_handler *hdl, struct v4l2_ext_controls *c);
 
 /**
  * v4l2_s_ext_ctrls - Helper function to implement
@@ -1134,6 +1160,7 @@ int v4l2_try_ext_ctrls(struct v4l2_ctrl_handler *hdl,
  *
  * If hdl == NULL then they will all return -EINVAL.
  */
+/* Helpers for ioctl_ops. If hdl == NULL then they will all return -EINVAL. */
 int v4l2_s_ext_ctrls(struct v4l2_fh *fh, struct v4l2_ctrl_handler *hdl,
 		     struct v4l2_ext_controls *c);
 

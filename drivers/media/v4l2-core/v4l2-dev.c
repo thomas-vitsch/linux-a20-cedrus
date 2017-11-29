@@ -562,6 +562,7 @@ static void determine_valid_ioctls(struct video_device *vdev)
 	SET_VALID_IOCTL(ops, VIDIOC_G_FREQUENCY, vidioc_g_frequency);
 	SET_VALID_IOCTL(ops, VIDIOC_S_FREQUENCY, vidioc_s_frequency);
 	SET_VALID_IOCTL(ops, VIDIOC_LOG_STATUS, vidioc_log_status);
+	set_bit(_IOC_NR(VIDIOC_REQUEST_CMD), valid_ioctls);
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 	set_bit(_IOC_NR(VIDIOC_DBG_G_CHIP_INFO), valid_ioctls);
 	set_bit(_IOC_NR(VIDIOC_DBG_G_REGISTER), valid_ioctls);
@@ -841,6 +842,8 @@ int __video_register_device(struct video_device *vdev, int type, int nr,
 	if (WARN_ON(!vdev->v4l2_dev))
 		return -EINVAL;
 
+	INIT_LIST_HEAD(&vdev->list);
+
 	/* v4l2_fh support */
 	spin_lock_init(&vdev->fh_lock);
 	INIT_LIST_HEAD(&vdev->fh_list);
@@ -990,6 +993,9 @@ int __video_register_device(struct video_device *vdev, int type, int nr,
 
 	/* Part 6: Activate this minor. The char device can now be used. */
 	set_bit(V4L2_FL_REGISTERED, &vdev->flags);
+	spin_lock(&vdev->v4l2_dev->lock);
+	list_add_tail(&vdev->list, &vdev->v4l2_dev->vdevs);
+	spin_unlock(&vdev->v4l2_dev->lock);
 
 	return 0;
 
@@ -1025,6 +1031,9 @@ void video_unregister_device(struct video_device *vdev)
 	 */
 	clear_bit(V4L2_FL_REGISTERED, &vdev->flags);
 	mutex_unlock(&videodev_lock);
+	spin_lock(&vdev->v4l2_dev->lock);
+	list_del(&vdev->list);
+	spin_unlock(&vdev->v4l2_dev->lock);
 	device_unregister(&vdev->dev);
 }
 EXPORT_SYMBOL(video_unregister_device);

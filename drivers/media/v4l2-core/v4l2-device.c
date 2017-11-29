@@ -29,6 +29,7 @@
 #include <linux/videodev2.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
+#include <media/videobuf2-v4l2.h>
 
 int v4l2_device_register(struct device *dev, struct v4l2_device *v4l2_dev)
 {
@@ -36,6 +37,7 @@ int v4l2_device_register(struct device *dev, struct v4l2_device *v4l2_dev)
 		return -EINVAL;
 
 	INIT_LIST_HEAD(&v4l2_dev->subdevs);
+	INIT_LIST_HEAD(&v4l2_dev->vdevs);
 	spin_lock_init(&v4l2_dev->lock);
 	v4l2_prio_init(&v4l2_dev->prio);
 	kref_init(&v4l2_dev->ref);
@@ -320,3 +322,29 @@ void v4l2_device_unregister_subdev(struct v4l2_subdev *sd)
 		module_put(sd->owner);
 }
 EXPORT_SYMBOL_GPL(v4l2_device_unregister_subdev);
+
+#if defined(CONFIG_VIDEOBUF2_CORE)
+int v4l2_device_req_queue(struct v4l2_device *v4l2_dev, u16 request)
+{
+	struct video_device *vdev;
+	struct video_device *tmp;
+	int err;
+
+	if (request == 0)
+		return -EINVAL;
+
+	list_for_each_entry_safe(vdev, tmp, &v4l2_dev->vdevs, list) {
+		if (vdev->queue == NULL || !vdev->queue->v4l2_allow_requests)
+			continue;
+		if (vdev->lock && mutex_lock_interruptible(vdev->lock))
+			return -ERESTARTSYS;
+		err = vb2_qbuf_request(vdev->queue, request, NULL);
+		if (vdev->lock)
+			mutex_unlock(vdev->lock);
+		if (err)
+			return err;
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(v4l2_device_req_queue);
+#endif
