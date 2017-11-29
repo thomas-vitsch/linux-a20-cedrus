@@ -1622,13 +1622,10 @@ enum v4l2_ctrl_type {
 	V4L2_CTRL_TYPE_U8	     = 0x0100,
 	V4L2_CTRL_TYPE_U16	     = 0x0101,
 	V4L2_CTRL_TYPE_U32	     = 0x0102,
-<<<<<<< HEAD
-=======
 	V4L2_CTRL_TYPE_MPEG2_FRAME_HDR  = 0x0109,
 	V4L2_CTRL_TYPE_MPEG4_FRAME_HDR  = 0x010A,
 
 	V4L2_CTRL_TYPE_PRIVATE       = 0xffff,
->>>>>>> f0c40ab... v4l: Add MPEG2 low-level decoder API control
 };
 
 /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
