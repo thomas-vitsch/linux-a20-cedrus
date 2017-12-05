@@ -1,4 +1,4 @@
-/*
+	/*
  * Copyright 2013 Emilio López
  *
  * Emilio López <emilio@elopez.com.ar>
@@ -27,9 +27,17 @@
 #include "clk-factors.h"
 
 static DEFINE_SPINLOCK(clk_lock);
+static DEFINE_SPINLOCK(sun7i_a20_pll6_lock);
 
 /* Maximum number of parents our clocks have */
 #define SUNXI_MAX_PARENTS	5
+
+struct reset_data {
+	void __iomem			*reg;
+	spinlock_t			*lock;
+	struct reset_controller_dev	rcdev;
+	u8				offset;
+};
 
 /**
  * sun4i_get_pll1_factors() - calculates n, k, m, p factors for PLL1
@@ -37,7 +45,6 @@ static DEFINE_SPINLOCK(clk_lock);
  * rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
  * parent_rate is always 24Mhz
  */
-
 static void sun4i_get_pll1_factors(struct factors_request *req)
 {
 	u8 div;
@@ -77,6 +84,51 @@ static void sun4i_get_pll1_factors(struct factors_request *req)
 	div <<= req->p;
 	div /= (req->k + 1);
 	req->n = div / 4;
+}
+
+/**
+ * sun7i_get_pll6_factors() - calculates n, k, m factors for PLL6
+ * PLL6 rate is calculated as follows
+ * rate = (parent_rate * n * (k + 1));
+ * parent_rate is always 24Mhz
+ */
+
+static void sun7i_get_pll6_factors(struct factors_request *req)
+{
+	uint32_t k, n, rest, best_rest, rate;
+
+	best_rest = 0xffffffff;
+
+	/* m and p is always zero for pll6 */
+	req->m = 0;
+	req->p = 0;
+
+	rate = req->rate;
+
+	for (k = 1; k <= 4; k++) { 
+		n = rate / 24000000 / k;
+		rest = rate % (24000000 * k);
+
+		if (rest > 24000000 / 2 * k) {
+			n++;
+			rest = 24000000 / 2 * k - rest;
+		}
+
+		if (n > 31)
+			continue;
+
+		if (rate == 24000000 * k * n) {
+			req->k = k - 1;
+			req->n = n;
+			break;
+		}
+
+		if (rest < best_rest) {
+			req->k = k - 1;
+			req->n = n;
+			best_rest = rest;
+		}
+	}
 }
 
 /**
@@ -380,9 +432,6 @@ static void sun4i_get_apb1_factors(struct factors_request *req)
 	req->p = calcp;
 }
 
-
-
-
 /**
  * sun7i_a20_get_out_factors() - calculates m, p factors for CLK_OUT_A/B
  * CLK_OUT rate is calculated as follows
@@ -416,6 +465,73 @@ static void sun7i_a20_get_out_factors(struct factors_request *req)
 	req->p = calcp;
 }
 
+static inline struct reset_data *rcdev_to_reset_data(
+    struct reset_controller_dev *rcdev)
+{
+
+	return container_of(rcdev, struct reset_data, rcdev);
+};
+
+static int sun7i_a20_pll6_assert(struct reset_controller_dev *rcdev,
+    unsigned long id)
+{
+	struct reset_data *data;
+	unsigned long flags;
+	u32 reg;
+
+	data = rcdev_to_reset_data(rcdev);
+	spin_lock_irqsave(data->lock, flags);
+
+	reg = readl(data->reg);
+	writel(reg & ~BIT(data->offset + id), data->reg);
+
+	spin_unlock_irqrestore(data->lock, flags);
+
+	return 0;
+}
+
+static int sun7i_a20_pll6_deassert(struct reset_controller_dev *rcdev,
+    unsigned long id)
+{
+	struct reset_data *data;
+	unsigned long flags;
+	u32 reg;
+
+	data = rcdev_to_reset_data(rcdev);
+	spin_lock_irqsave(data->lock, flags);
+
+	reg = readl(data->reg);
+	writel(reg | BIT(data->offset + id), data->reg);
+
+	spin_unlock_irqrestore(data->lock, flags);
+
+	return 0;
+}
+
+static int sun7i_a20_pll6_reset_xlate(struct reset_controller_dev *rcdev,
+    const struct of_phandle_args *spec)
+{
+	/* We only have a single reset signal */
+	return 0;
+}
+
+static int sun7i_a20_pll6_status(struct reset_controller_dev *rcdev,
+    unsigned long id)
+{
+	struct reset_data *data;
+
+	data = rcdev_to_reset_data(rcdev);
+
+	return !(readl(data->reg) & BIT(data->offset + id));
+}
+
+static const struct reset_control_ops sun7i_a20_pll6_reset_ops = {
+	.assert		= sun7i_a20_pll6_assert,
+	.deassert	= sun7i_a20_pll6_deassert,
+	.status		= sun7i_a20_pll6_status,
+};
+
+
 /**
  * sunxi_factors_clk_setup() - Setup function for factor clocks
  */
@@ -429,6 +545,15 @@ static const struct clk_factors_config sun4i_pll1_config = {
 	.mwidth = 2,
 	.pshift = 16,
 	.pwidth = 2,
+};
+
+static const struct clk_factors_config sun7i_pll6_config = {
+	.nshift = 8,
+	.nwidth = 5,
+	.kshift = 4,
+	.kwidth = 2,
+	.mshift = 0,
+	.mwidth = 2,
 };
 
 static const struct clk_factors_config sun6i_a31_pll1_config = {
@@ -499,6 +624,12 @@ static const struct factors_data sun4i_pll1_data __initconst = {
 	.enable = 31,
 	.table = &sun4i_pll1_config,
 	.getter = sun4i_get_pll1_factors,
+};
+
+static const struct factors_data sun7i_pll6_data __initconst = {
+	.enable = 31,
+	.table = &sun7i_pll6_config,
+	.getter = sun7i_get_pll6_factors,
 };
 
 static const struct factors_data sun6i_a31_pll1_data __initconst = {
@@ -582,6 +713,56 @@ static void __init sun4i_pll1_clk_setup(struct device_node *node)
 }
 CLK_OF_DECLARE(sun4i_pll1, "allwinner,sun4i-a10-pll1-clk",
 	       sun4i_pll1_clk_setup);
+
+static void __init sun7i_pll6_clk_setup(struct device_node *node)
+{
+	struct reset_data *reset_data;
+	void __iomem *reg;
+	struct clk *clk;
+	const char *clk_name = node->name;
+
+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+	if (IS_ERR(reg)) {
+		pr_err("%s: Could not map the clock registers\n", clk_name);
+		return;
+	}
+
+	clk = sunxi_factors_clk_setup(node, &sun7i_pll6_data);
+	if (IS_ERR(clk)) {
+		pr_err("%s: Could not register sunxi clock factors", clk_name);
+		goto unmap;
+	}
+
+	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
+	if (!reset_data)
+		goto error;
+
+	reset_data->reg = reg;
+	reset_data->offset = 30;
+	reset_data->lock = &sun7i_a20_pll6_lock;
+	reset_data->rcdev.nr_resets = 1;
+	reset_data->rcdev.ops = &sun7i_a20_pll6_reset_ops;
+	reset_data->rcdev.of_node = node;
+
+	reset_data->rcdev.of_reset_n_cells = 0;
+	reset_data->rcdev.of_xlate = &sun7i_a20_pll6_reset_xlate;
+
+	if (reset_controller_register(&reset_data->rcdev)) {
+		pr_err("%s: Couldn't register the reset controller\n",
+		    clk_name);
+		goto error;
+	}
+
+	return;
+error:
+	sunxi_factors_unregister(node, clk);
+unmap:
+	iounmap(reg);
+
+	return;
+}
+CLK_OF_DECLARE(sun7i_pll6, "allwinner,sun7i-a20-pll6-clk",
+	       sun7i_pll6_clk_setup);
 
 static void __init sun6i_pll1_clk_setup(struct device_node *node)
 {
