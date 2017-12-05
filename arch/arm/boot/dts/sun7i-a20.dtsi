@@ -282,8 +282,8 @@
 		};
 
 		pll6: clk@01c20028 {
-			#clock-cells = <1>;
-			compatible = "allwinner,sun4i-a10-pll6-clk";
+			#clock-cells = <0>;
+			compatible = "allwinner,sun7i-a20-pll6-clk";
 			reg = <0x01c20028 0x4>;
 			clocks = <&osc24M>;
 			clock-output-names = "pll6_sata", "pll6_other", "pll6",
@@ -319,7 +319,7 @@
 			#clock-cells = <0>;
 			compatible = "allwinner,sun4i-a10-cpu-clk";
 			reg = <0x01c20054 0x4>;
-			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&pll6 1>;
+			clocks = <&osc32k>, <&osc24M>, <&pll1>;
 			clock-output-names = "cpu";
 		};
 
@@ -342,7 +342,7 @@
 			 * which has rate changes due to cpufreq
 			 */
 			assigned-clocks = <&ahb>;
-			assigned-clock-parents = <&pll6 3>;
+			assigned-clock-parents = <&axi>;
 		};
 
 		ahb_gates: clk@01c20060 {
@@ -695,7 +695,7 @@
 			#reset-cells = <1>;
 			compatible = "allwinner,sun4i-a10-tcon-ch0-clk";
 			reg = <0x01c20118 0x4>;
-			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
+			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll6>;
 			clock-output-names = "tcon0-ch0-sclk";
 
 		};
