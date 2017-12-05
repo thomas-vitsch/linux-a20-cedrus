@@ -12,13 +12,20 @@
 
 #include <linux/clk-provider.h>
 #include <linux/regmap.h>
+#include <drm/drmP.h>
 
 #include "sun4i_tcon.h"
 #include "sun4i_dotclock.h"
 
+
+#define NS_JEIDA_LVDS_BITS_PER_PIX_CLK			7
+
+
 struct sun4i_dclk {
-	struct clk_hw	hw;
-	struct regmap	*regmap;
+	struct clk_hw		hw;
+	struct regmap		*regmap;
+
+	struct sun4i_tcon	*tcon;
 };
 
 static inline struct sun4i_dclk *hw_to_dclk(struct clk_hw *hw)
@@ -54,7 +61,7 @@ static int sun4i_dclk_is_enabled(struct clk_hw *hw)
 }
 
 static unsigned long sun4i_dclk_recalc_rate(struct clk_hw *hw,
-					    unsigned long parent_rate)
+    unsigned long parent_rate)
 {
 	struct sun4i_dclk *dclk = hw_to_dclk(hw);
 	u32 val;
@@ -67,22 +74,47 @@ static unsigned long sun4i_dclk_recalc_rate(struct clk_hw *hw,
 	if (!val)
 		val = 1;
 
+	DRM_DEBUG_DRIVER("%s:%d return parent_rate(%lu) / div(%u) = %lu\n",
+	    __FUNCTION__, __LINE__, parent_rate, val,
+	    parent_rate / val);
+
 	return parent_rate / val;
 }
 
 static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
 				  unsigned long *parent_rate)
 {
-	unsigned long best_parent = 0;
-	u8 best_div = 1;
-	int i;
+	unsigned long best_parent;
+	struct sun4i_dclk *dclk;
+	int i, min_div, max_div;
+	unsigned long rounded;
+	unsigned long ideal;
+	u8 best_div;
 
-	for (i = 6; i <= 127; i++) {
-		unsigned long ideal = rate * i;
-		unsigned long rounded;
+	dclk = hw_to_dclk(hw);
+	best_parent = 0;
+	best_div = 1;
+
+	DRM_DEBUG_DRIVER("connector type is %d\n",
+	    dclk->tcon->connector->connector_type);
+
+	/*
+	 * When generating LVDS output, dclk must always be 7* the LVDS
+	 * signaling clock rate.
+	 */
+	if (dclk->tcon->connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
+		min_div = NS_JEIDA_LVDS_BITS_PER_PIX_CLK;
+		max_div = NS_JEIDA_LVDS_BITS_PER_PIX_CLK;
+	} else {
+		min_div = DCLK_DIV_MIN;
+		max_div = DCLK_DIV_MAX;
+	}
+
+	for (i = min_div; i <= max_div; i++) {
+		ideal = rate * i;
 
 		rounded = clk_hw_round_rate(clk_hw_get_parent(hw),
-					    ideal);
+		    ideal);
 
 		if (rounded == ideal) {
 			best_parent = rounded;
@@ -98,6 +130,10 @@ static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
 	}
 
 out:
+	DRM_DEBUG_DRIVER("%s:%d return best_parent(%lu) / best_div (%u) = %lu\n",
+	    __FUNCTION__, __LINE__, best_parent, best_div,
+	    best_parent / best_div);
+
 	*parent_rate = best_parent;
 
 	return best_parent / best_div;
@@ -108,6 +144,9 @@ static int sun4i_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
 {
 	struct sun4i_dclk *dclk = hw_to_dclk(hw);
 	u8 div = parent_rate / rate;
+
+	printk("%s:%d rate = %ld, parent_rate = %ld\n", __FUNCTION__, __LINE__,
+	    rate, parent_rate);
 
 	return regmap_update_bits(dclk->regmap, SUN4I_TCON0_DCLK_REG,
 				  GENMASK(6, 0), div);
@@ -180,6 +219,12 @@ int sun4i_dclk_create(struct device *dev, struct sun4i_tcon *tcon)
 	tcon->dclk = clk_register(dev, &dclk->hw);
 	if (IS_ERR(tcon->dclk))
 		return PTR_ERR(tcon->dclk);
+
+	/*
+	 * DAAN: Make sure we have a reference back to the tcon controller we
+	 * belong to.
+	 */
+	dclk->tcon = tcon;
 
 	return 0;
 }

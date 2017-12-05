@@ -55,12 +55,20 @@ static int sun4i_rgb_get_modes(struct drm_connector *connector)
 static int sun4i_rgb_mode_valid(struct drm_connector *connector,
 				struct drm_display_mode *mode)
 {
-	struct sun4i_rgb *rgb = drm_connector_to_sun4i_rgb(connector);
-	struct sun4i_tcon *tcon = rgb->tcon;
-	u32 hsync = mode->hsync_end - mode->hsync_start;
-	u32 vsync = mode->vsync_end - mode->vsync_start;
-	unsigned long rate = mode->clock * 1000;
+	struct sun4i_rgb *rgb;
+	struct sun4i_tcon *tcon;
+	u32 hsync;
+	u32 vsync;
+	unsigned long rate;
 	long rounded_rate;
+
+	rgb = drm_connector_to_sun4i_rgb(connector);
+	tcon = rgb->tcon;
+	hsync = mode->hsync_end - mode->hsync_start;
+	vsync = mode->vsync_end - mode->vsync_start;
+	rate = mode->clock * 1000;
+
+	rgb->tcon->connector = &rgb->connector;
 
 	DRM_DEBUG_DRIVER("Validating modes...\n");
 
@@ -215,7 +223,7 @@ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
 	ret = drm_encoder_init(drm,
 			       &rgb->encoder,
 			       &sun4i_rgb_enc_funcs,
-			       DRM_MODE_ENCODER_NONE,
+			       DRM_MODE_ENCODER_LVDS,
 			       NULL);
 	if (ret) {
 		dev_err(drm->dev, "Couldn't initialise the rgb encoder\n");
@@ -230,7 +238,7 @@ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
 					 &sun4i_rgb_con_helper_funcs);
 		ret = drm_connector_init(drm, &rgb->connector,
 					 &sun4i_rgb_con_funcs,
-					 DRM_MODE_CONNECTOR_Unknown);
+					 DRM_MODE_CONNECTOR_LVDS);
 		if (ret) {
 			dev_err(drm->dev, "Couldn't initialise the rgb connector\n");
 			goto err_cleanup_connector;

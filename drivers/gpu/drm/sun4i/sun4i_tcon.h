@@ -168,6 +168,8 @@ struct sun4i_tcon {
 
 	struct drm_panel		*panel;
 
+	struct drm_connector		*connector;
+
 	/* Platform adjustments */
 	const struct sun4i_tcon_quirks	*quirks;
 
