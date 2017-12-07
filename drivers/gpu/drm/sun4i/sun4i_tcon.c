@@ -156,6 +156,7 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
 	unsigned int bp, hsync, vsync;
 	u8 clk_delay;
 	u32 val = 0;
+	uint32_t conn_bus_flags;
 
 	/* Configure the dot clock */
 	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
@@ -163,38 +164,37 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
 	/* Adjust clock delay */
 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
 	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
-			   SUN4I_TCON0_CTL_CLK_DELAY_MASK,
-			   SUN4I_TCON0_CTL_CLK_DELAY(clk_delay));
+	    SUN4I_TCON0_CTL_CLK_DELAY_MASK,
+	    SUN4I_TCON0_CTL_CLK_DELAY(clk_delay));
 
 	/* Set the resolution */
 	regmap_write(tcon->regs, SUN4I_TCON0_BASIC0_REG,
-		     SUN4I_TCON0_BASIC0_X(mode->crtc_hdisplay) |
-		     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
+	    SUN4I_TCON0_BASIC0_X(mode->crtc_hdisplay) |
+	    SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
 
 	/*
-	 * This is called a backporch in the register documentation,
-	 * but it really is the back porch + hsync
-	 */
-	bp = mode->crtc_htotal - mode->crtc_hsync_start;
+         * This is called a backporch in the register documentation,
+         * but it really is the back porch + hsync
+         */
+	bp = mode->crtc_htotal - mode->crtc_hdisplay;
 	DRM_DEBUG_DRIVER("Setting horizontal total %d, backporch %d\n",
-			 mode->crtc_htotal, bp);
+	    mode->crtc_htotal, bp);
 
-	/* Set horizontal display timings */
 	regmap_write(tcon->regs, SUN4I_TCON0_BASIC1_REG,
-		     SUN4I_TCON0_BASIC1_H_TOTAL(mode->crtc_htotal) |
-		     SUN4I_TCON0_BASIC1_H_BACKPORCH(bp));
+	    SUN4I_TCON0_BASIC1_H_TOTAL(mode->crtc_htotal) |
+	    SUN4I_TCON0_BASIC1_H_BACKPORCH(bp));
 
 	/*
 	 * This is called a backporch in the register documentation,
-	 * but it really is the back porch + hsync
+	 * but it really is the back porch + vsync
 	 */
-	bp = mode->crtc_vtotal - mode->crtc_vsync_start;
+	bp = mode->crtc_vtotal - mode->crtc_vdisplay;
 	DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
 			 mode->crtc_vtotal, bp);
 
 	/* Set vertical display timings */
 	regmap_write(tcon->regs, SUN4I_TCON0_BASIC2_REG,
-		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal * 2) |
+		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal) |
 		     SUN4I_TCON0_BASIC2_V_BACKPORCH(bp));
 
 	/* Set Hsync and Vsync length */
@@ -223,6 +223,28 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
 
 	/* Enable the output on the pins */
 	regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG, 0);
+
+	if (tcon->connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
+		DRM_DEBUG_DRIVER("Enabling lvds for lvds connector\n");
+		conn_bus_flags = tcon->connector->display_info.bus_flags;
+
+		/* Due to the manner the lvds signals come out of the A20 chip,
+		 * the LVDS direction will probably be reversed.
+		 */
+		regmap_write(tcon->regs, SUN4I_TCON0_LVDS_IF_REG,
+		    SUN4I_TCON0_LVDS_IF_ENABLE |
+		    SUN4I_TCON0_LVDS_EVEN_ODD_DIR(LVDS_DIR_REVERSE));
+
+		/* Nobody knows the layout of these registers. u-boot uses this value
+		 * to enable lvds, without these values we cannot properly use lvds
+		 * panels. U-boot sources show us these magic values also. Some
+		 * datasheets describe these registers but they
+		 * cannot be valid as the magic values set bits which are reserved,
+		 * or otherwise behave differently when set/cleared.
+		 */
+		regmap_write(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG, ANA0_MAGIC_VAL);
+		regmap_write(tcon->regs, SUN4I_TCON0_LVDS_ANA1_REG, ANA1_MAGIC_VAL);
+	}
 }
 EXPORT_SYMBOL(sun4i_tcon0_mode_set);
 
