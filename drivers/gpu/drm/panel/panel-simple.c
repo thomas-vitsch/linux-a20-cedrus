@@ -1403,11 +1403,6 @@ static const struct panel_desc nec_nl4827hc19_05b = {
 	.bus_flags = DRM_BUS_FLAG_PIXDATA_POSEDGE,
 };
 
-/* The clock value is multiplied by 1000.
- * The actual clock we would like to use is 68571428
- * This clock is already divided by 2 as this is dual lane.
- * TODO: Thomas check if this is still valid or should be done differently.
- */
 static const struct drm_display_mode au_opt_m195rtn01_1_mode = {
 	.clock = 144000,
 	.hdisplay = 1600,
@@ -1423,13 +1418,37 @@ static const struct drm_display_mode au_opt_m195rtn01_1_mode = {
 	.flags = DRM_MODE_FLAG_DBLCLK
 };
 
-/* Read the mode above. The width value is doubled here for using dual lane. */
 static const struct panel_desc au_opt_m195rtn01_1 = {
 	.modes = &au_opt_m195rtn01_1_mode,
 	.num_modes = 1,
 	.size = {
 		.width = 4372,
 		.height = 2396,
+	},
+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+};
+
+static const struct drm_display_mode au_opt_m270hvn02_1_mode = {
+	.clock = 144000,
+	.hdisplay = 1920,
+	.vdisplay = 1080,
+
+	.hsync_start = 1920 + 0,
+	.hsync_end = 1920 + 0 + 50,
+	.htotal = 1920 + 30 + 50,
+	.vsync_start = 1080 + 0,
+	.vsync_end = 1080 + 0 + 45,
+	.vtotal = 1080 + 120,
+	.vrefresh = 60,
+	.flags = DRM_MODE_FLAG_DBLCLK
+};
+
+static const struct panel_desc au_opt_m270hvn02_1 = {
+	.modes = &au_opt_m270hvn02_1_mode,
+	.num_modes = 1,
+	.size = {
+		.width = 630,
+		.height = 368,
 	},
 	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
 };
@@ -2095,6 +2114,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
 		.compatible = "au_opt,m195rtn01_1",
 		.data = &au_opt_m195rtn01_1,
+	}, {
+		.compatible = "au_opt,m270hvn02_1",
+		.data = &au_opt_m270hvn02_1,
 	}, {
 		.compatible = "netron-dy,e231732",
 		.data = &netron_dy_e231732,
