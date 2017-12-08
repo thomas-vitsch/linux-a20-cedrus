@@ -486,6 +486,16 @@ config VIDEO_SUNXI_CEDRUS
 	  To compile this driver as a module, choose M here: the module
 	  will be called sunxi-cedrus.
 
+config SUNXI_FRONT_END
+	tristate "Allwinner A20 Display Engine Frontend Driver"
+	depends on ARCH_SUNXI
+	depends on HAS_DMA
+	---help---
+	  Support for the Front End found on Sunxi SoC.
+
+	  To compile this driver as a module, choose M her: the module
+	  will be called sunxi-front-end.
+
 config VIDEO_TI_VPE_DEBUG
 	bool "VPE debug messages"
 	depends on VIDEO_TI_VPE
