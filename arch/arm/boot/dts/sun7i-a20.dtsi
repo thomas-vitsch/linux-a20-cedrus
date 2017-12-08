@@ -1685,7 +1685,7 @@
 		};
 
 		fe0: display-frontend@1e00000 {
-			compatible = "allwinner,sun7i-a20-display-frontend";
+			compatible = "allwinner,sun7i-a20-front-end";
 			reg = <0x01e00000 0x20000>;
 			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&ahb_gates 46>, <&de_fe0_clk>,
