@@ -67,7 +67,7 @@ obj-y	+= omap/
 
 obj-$(CONFIG_VIDEO_AM437X_VPFE)		+= am437x/
 obj-$(CONFIG_VIDEO_SUNXI_CEDRUS)	+= sunxi-cedrus/
-obj-$(CONFIG_VIDEO_V4L2_FRONT_END)	+= v4l2_front_end/
+obj-$(CONFIG_SUNXI_FRONT_END)		+= v4l2_front_end/
 
 obj-$(CONFIG_VIDEO_XILINX)		+= xilinx/
 
